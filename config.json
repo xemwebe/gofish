@@ -1,0 +1,19 @@
+{
+  "allow_admin": false,
+	"file_path":   "/var/www/My_File_Storage",
+	"ip_address":  "127.0.0.1",
+	"port":        "7356",
+	"title":       "My Private Web File Sharing Site",
+	"favicon":     "/images/sgws.ico",
+	"realm": 	     "SimpleGoWebSpace",
+	"author":      "<Page's owner name>",
+	"email":       "<Page's owner email address>",
+	"subject":     "MyPrivateWebSpace",
+	"userpwhash":	 "",
+	"adminpwhash": "",
+	"colors": {
+		"title": "Navy",
+		"buttonfg": "OrangeRed",
+		"buttonbg": "Gold"
+	}
+}
