@@ -4,7 +4,7 @@ A simple file sharing server with basich authentication and read-only/admin user
 
 If you ever (like me) searched for a simple tool to install on your own server a secure file sharing service, this little tool might be what you need. gofish establishes a server that provides acces to files in a configurable directory tree on the server for authorised users using basic authentication.
 
-Two different user roles are support:
+Two different user roles are supported:
 
 * a standard user with read-only access to the files
 
