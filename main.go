@@ -34,8 +34,8 @@ type Configuration struct {
 	Author       string    `json:"author"`
 	EMail        string    `json:"email"`
 	EMailSubject string    `json:"subject"`
-	UserPWHash   string    `json:"userpwhash`
-	AdminPWHash  string    `json:"adminpwhash`
+	UserPWHash   string    `json:"userpwhash"`
+	AdminPWHash  string    `json:"adminpwhash"`
 	Colors       ColorConf `json:"colors"`
 }
 
@@ -106,11 +106,11 @@ var (
 
 func main() {
 	genPW := flag.Bool("gen-pwd", false, "Generate Password Hash")
-	flag.StringVar(&Conf.FilePath, "path", Conf.FilePath, "Path to files folder")
-	flag.BoolVar(&Conf.AllowAdmin, "admin", Conf.AllowAdmin, "Setup server for administration")
-	flag.StringVar(&Conf.IpAddress, "ipaddress", Conf.IpAddress, "IP address server to listen at")
-	flag.StringVar(&Conf.Port, "port", Conf.Port, "File server port")
-	flag.StringVar(&Conf.Realm, "realm", Conf.Realm, "Name of realm")
+	filePath := flag.String("path", "", "Path to files folder")
+	adminFlag := flag.Bool("admin", false, "Setup server for administration")
+	ipAddress := flag.String("ipaddress", "", "IP address server to listen at")
+	port := flag.String("port", "", "File server port")
+	realm := flag.String("realm", "", "Name of realm")
 	configFile := flag.String("config", "", "Name of config file, if given, this overrides all flags")
 	flag.Parse()
 
@@ -118,7 +118,8 @@ func main() {
 		pass := flag.Arg(0)
 		passHash, err := bcrypt.GenerateFromPassword([]byte(pass+"!GoFi"), bcrypt.DefaultCost)
 		if err != nil {
-			fmt.Errorf("Hash generation failed: %v\n", err)
+			fmt.Printf("Hash generation failed: %v\n", err)
+			return
 		}
 		fmt.Println(string(passHash))
 		return
@@ -127,14 +128,28 @@ func main() {
 		confFile, err := ioutil.ReadFile(*configFile)
 		if err != nil {
 			fmt.Printf("Could not open config file %q: %v\n", *configFile, err)
-			glog.Errorf("Could not open config file %q: %v\n", *configFile, err)
 			return
 		}
 		err = json.Unmarshal(confFile, &Conf)
 		if err != nil {
 			fmt.Printf("Config file %q has unexpected format: %v\n", *configFile, err)
-			glog.Errorf("Config file %q has unexpected format: %v\n", *configFile, err)
 			return
+		}
+		// Override configuration by CLI flags
+		if *filePath != "" {
+			Conf.FilePath = *filePath
+		}
+		if *adminFlag {
+			Conf.AllowAdmin = true
+		}
+		if *ipAddress != "" {
+			Conf.IpAddress = *ipAddress
+		}
+		if *port != "" {
+			Conf.Port = *port
+		}
+		if *realm != "" {
+			Conf.Realm = *realm
 		}
 	}
 
