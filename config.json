@@ -5,7 +5,7 @@
 	"port":        "7356",
 	"title":       "My Private Web File Sharing Site",
 	"favicon":     "/images/sgws.ico",
-	"realm": 	     "SimpleGoWebSpace",
+	"realm": 	     "GoFiSh",
 	"author":      "<Page's owner name>",
 	"email":       "<Page's owner email address>",
 	"subject":     "MyPrivateWebSpace",
