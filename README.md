@@ -20,17 +20,17 @@ gofish may be configured using command line arguments or by a configuration file
 
 1. If not already done, install [go](https://golang.org/) on your server or some other binary compatible computer and compile gofish like any other go executable
 
-1. Please make sure that the folder in which you execute the gofish application must contain the views folder (the gofish binary may be in any othe folder). The images folder should be in the same folder as the views folder, so this is not a requirement.
+2. Please make sure that the folder in which you execute the gofish application must contain the views folder (the gofish binary may be in any othe folder). The images folder should be in the same folder as the views folder, so this is not a requirement.
 
-1. Define a folder for where you wish to put the shared files.
+3. Define a folder for where you wish to put the shared files.
 
-1. Generate password hashes for the read-only user (user name is the empty string "") and the admin user (user name is "admin") by the command:
+4. Generate password hashes for the read-only user (user name is the empty string "") and the admin user (user name is "admin") by the command:
 
 ```bash
 gofish -gen-pwd <password>
 ```
 
-1. Make the appropriate changes in the config file:
+5. Make the appropriate changes in the config file:
 
 ```json
 {
@@ -55,7 +55,7 @@ gofish -gen-pwd <password>
 
 The user password hash and the admin password hash must be set to the hashes generated in the previous step. Also, make sure the file_path is set to an absolute path on your server. The user, under which the gofish is running, must have read and write acces (if run in admin mode) for this folder. If `allow_admin` is set, the server runs in admin mode (i.e. the admin may upload/delete files and folders), otherwise the server runs in read-only mode. 
 
-1. After configuration is complete, start the server:
+6. After configuration is complete, start the server:
 
 ```bash
 gofish -admin -config=./config.json
