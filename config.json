@@ -1,10 +1,10 @@
 {
   "allow_admin": false,
-	"file_path":   "~/My_File_Storage",
+	"file_path":   "./My_File_Storage",
 	"ip_address":  "127.0.0.1",
 	"port":        "7356",
 	"title":       "My Private Web File Sharing Site",
-	"favicon":     "~/images/sgws.ico",
+	"favicon":     "./images/sgws.ico",
 	"realm": 	     "GoFiSh",
 	"author":      "<Page's owner name>",
 	"email":       "<Page's owner email address>",
