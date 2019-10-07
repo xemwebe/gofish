@@ -261,9 +261,9 @@ func (di *DirInfo) getDir(path string) {
 
 func makeNewDir(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	dirName := r.PostFormValue("dirName")
-	urlPath := strings.TrimPrefix(r.PostFormValue("fullpath"), "/home")
-	newDirPath := Conf.FilePath + sanitize(urlPath+"/"+dirName)
+	dirName := sanitize(r.PostFormValue("dirName"))
+	urlPath := strings.TrimPrefix(sanitize(r.PostFormValue("fullpath")), "/home")
+	newDirPath := Conf.FilePath + urlPath + "/" + dirName
 	err := os.Mkdir(newDirPath, 0770)
 	if err != nil {
 		glog.Errorf("makeNewDir failed: %v", err)
@@ -280,8 +280,10 @@ func deleteFile(path string) {
 
 func forDownload(w http.ResponseWriter, r *http.Request) {
 	urlPath := strings.TrimPrefix(r.URL.Path, "/serve/")
-	totalPath := Conf.FilePath + "/" + sanitize(urlPath)
+	fileName := sanitize(urlPath)
+	totalPath := Conf.FilePath + "/" + fileName
 	glog.Infof("forDownload: urlPath='%v'", totalPath)
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
 	http.ServeFile(w, r, totalPath)
 }
 
@@ -302,7 +304,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.ParseMultipartForm(32 << 20)
-	relPath := r.PostFormValue("fullpath")
+	relPath := sanitize(r.PostFormValue("fullpath"))
 	absPath := Conf.FilePath + sanitize(strings.TrimPrefix(relPath, "/home"))
 	fhs := r.MultipartForm.File["uploadfile"]
 	for _, fh := range fhs {

@@ -1,6 +1,6 @@
 {
   "allow_admin": false,
-	"file_path":   "./My_File_Storage",
+	"file_path":   "./files",
 	"ip_address":  "127.0.0.1",
 	"port":        "7356",
 	"title":       "My Private Web File Sharing Site",
