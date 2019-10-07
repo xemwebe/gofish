@@ -107,7 +107,7 @@ var (
 func main() {
 	genPW := flag.Bool("gen-pwd", false, "Generate Password Hash")
 	filePath := flag.String("path", "", "Path to files folder")
-	adminFlag := flag.Bool("admin", false, "Setup server for administration")
+	allowAdminFlag := flag.Bool("admin", false, "Setup server to allow login as admin")
 	ipAddress := flag.String("ipaddress", "", "IP address server to listen at")
 	port := flag.String("port", "", "File server port")
 	realm := flag.String("realm", "", "Name of realm")
@@ -139,7 +139,7 @@ func main() {
 		if *filePath != "" {
 			Conf.FilePath = *filePath
 		}
-		if *adminFlag {
+		if *allowAdminFlag {
 			Conf.AllowAdmin = true
 		}
 		if *ipAddress != "" {
@@ -202,7 +202,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 	fullPath := joinPath(Conf.FilePath, "/", urlPath)
 	glog.Infof("Insert index handler with path=%s", fullPath)
 
-	if r.Method == "POST" {
+	if r.Method == "POST" && isAdmin() {
 		glog.Infof("Post request.")
 		r.ParseForm()
 		if glog.V(2) {
@@ -259,22 +259,26 @@ func (di *DirInfo) getDir(path string) {
 }
 
 func makeNewDir(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	dirName := sanitize(r.PostFormValue("dirName"), false)
 	urlPath := sanitize(strings.TrimPrefix(r.PostFormValue("fullpath"), "/home/"), true)
-	newDirPath := Conf.FilePath + "/" + urlPath + "/" + dirName
-	err := os.Mkdir(newDirPath, 0770)
-	if err != nil {
-		glog.Errorf("makeNewDir failed: %v", err)
+	if isAdmin() {
+		r.ParseForm()
+		dirName := sanitize(r.PostFormValue("dirName"), false)
+		newDirPath := Conf.FilePath + "/" + urlPath + "/" + dirName
+		err := os.Mkdir(newDirPath, 0770)
+		if err != nil {
+			glog.Errorf("makeNewDir failed: %v", err)
+		}
+		glog.Infof("makeNewDir: urlPath='%s', newDirPath='%s'", urlPath, newDirPath)
 	}
-	glog.Infof("makeNewDir: urlPath='%s', newDirPath='%s'", urlPath, newDirPath)
 	http.Redirect(w, r, "/home/"+urlPath, http.StatusFound)
 }
 
 func deleteFile(path string) {
-	path = path
-	glog.Infof("Delete File: %s", path)
-	os.RemoveAll(path)
+	if isAdmin() {
+		path = path
+		glog.Infof("Delete File: %s", path)
+		os.RemoveAll(path)
+	}
 }
 
 func forDownload(w http.ResponseWriter, r *http.Request) {
@@ -304,29 +308,30 @@ func upload(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseMultipartForm(32 << 20)
 	relPath := sanitize(r.PostFormValue("fullpath"), true)
-	absPath := Conf.FilePath + "/" + sanitize(strings.TrimPrefix(relPath, "/home/"), true)
-	fhs := r.MultipartForm.File["uploadfile"]
-	for _, fh := range fhs {
-		file, err := fh.Open()
-		if err != nil {
-			glog.Errorf("Upload failed: %v", err)
-			return
+	if isAdmin() {
+		absPath := Conf.FilePath + "/" + sanitize(strings.TrimPrefix(relPath, "/home/"), true)
+		fhs := r.MultipartForm.File["uploadfile"]
+		for _, fh := range fhs {
+			file, err := fh.Open()
+			if err != nil {
+				glog.Errorf("Upload failed: %v", err)
+				return
+			}
+			defer file.Close()
+			if glog.V(2) {
+				glog.Infof("Upload Header: %v", fh.Header)
+			}
+			newFileName := absPath + sanitize(fh.Filename, false)
+			glog.Infof("Upload file with name '%s'", newFileName)
+			f, err := os.OpenFile(newFileName, os.O_WRONLY|os.O_CREATE, 0660)
+			if err != nil {
+				glog.Errorln(err)
+				return
+			}
+			defer f.Close()
+			io.Copy(f, file)
 		}
-		defer file.Close()
-		if glog.V(2) {
-			glog.Infof("Upload Header: %v", fh.Header)
-		}
-		newFileName := absPath + sanitize(fh.Filename, false)
-		glog.Infof("Upload file with name '%s'", newFileName)
-		f, err := os.OpenFile(newFileName, os.O_WRONLY|os.O_CREATE, 0660)
-		if err != nil {
-			glog.Errorln(err)
-			return
-		}
-		defer f.Close()
-		io.Copy(f, file)
 	}
-
 	http.Redirect(w, r, relPath, http.StatusFound)
 }
 
@@ -350,20 +355,19 @@ func authhandler(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if ok {
-			if user == "" {
-				// Readonly user
-				err := bcrypt.CompareHashAndPassword([]byte(Conf.UserPWHash), []byte(pass+"!GoFi"))
-				if err == nil {
-					adminFlag = false
-					handler(w, r)
-					return
-				}
-			}
-			if user == "admin" {
+			if user == "admin" && Conf.AllowAdmin {
 				// admin user may upload files
 				err := bcrypt.CompareHashAndPassword([]byte(Conf.AdminPWHash), []byte(pass+"!GoFi"))
 				if err == nil {
 					adminFlag = true
+					handler(w, r)
+					return
+				}
+			} else {
+				// Readonly user
+				err := bcrypt.CompareHashAndPassword([]byte(Conf.UserPWHash), []byte(pass+"!GoFi"))
+				if err == nil {
+					adminFlag = false
 					handler(w, r)
 					return
 				}
