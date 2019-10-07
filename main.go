@@ -89,13 +89,13 @@ var (
 	}
 	Conf = Configuration{
 		AllowAdmin:  false,
-		FilePath:    "/var/www/My_File_Storage",
+		FilePath:    "./files",
 		IpAddress:   "127.0.0.1",
 		Port:        "7356",
 		Title:       "My Private Web File Sharing Site",
-		Favicon:     "./favicon.ico",
-		UserPWHash:  "",
-		AdminPWHash: "",
+		Favicon:     "/images/sgws.ico",
+		UserPWHash:  "$2a$10$A9R3I6Le4LsFZuhYRIsn/.X59xIPb0Xdu2ytBg8T5JX41tzz/JxxW",
+		AdminPWHash: "$2a$10$A9R3I6Le4LsFZuhYRIsn/.X59xIPb0Xdu2ytBg8T5JX41tzz/JxxW",
 		Colors: ColorConf{
 			Title:    "Navy",
 			ButtonFG: "OrangeRed",
@@ -198,8 +198,8 @@ func badRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
-	urlPath := strings.TrimPrefix(r.URL.Path, "/home/")
-	fullPath := joinPath(Conf.FilePath, urlPath)
+	urlPath := sanitize(strings.TrimPrefix(r.URL.Path, "/home/"), true)
+	fullPath := joinPath(Conf.FilePath, "/", urlPath)
 	glog.Infof("Insert index handler with path=%s", fullPath)
 
 	if r.Method == "POST" {
@@ -210,7 +210,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 		}
 		files := make([]string, len(r.PostForm))
 		for key, _ := range r.PostForm {
-			deleteFile(fullPath + key)
+			deleteFile(fullPath + sanitize(key, false))
 		}
 		glog.Infof("Files: %v", files)
 	}
@@ -240,7 +240,6 @@ type DirInfo struct {
 
 func (di *DirInfo) getDir(path string) {
 	files, err := ioutil.ReadDir(path)
-	path = sanitize(path)
 	if err != nil {
 		glog.Errorf("Could not read directory: %v", err)
 		return
@@ -248,7 +247,7 @@ func (di *DirInfo) getDir(path string) {
 
 	for _, f := range files {
 		name := f.Name()
-		if name[0] == '.' {
+		if name == "." || name == ".." {
 			continue
 		}
 		if f.IsDir() {
@@ -261,26 +260,26 @@ func (di *DirInfo) getDir(path string) {
 
 func makeNewDir(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	dirName := sanitize(r.PostFormValue("dirName"))
-	urlPath := strings.TrimPrefix(sanitize(r.PostFormValue("fullpath")), "/home")
-	newDirPath := Conf.FilePath + urlPath + "/" + dirName
+	dirName := sanitize(r.PostFormValue("dirName"), false)
+	urlPath := sanitize(strings.TrimPrefix(r.PostFormValue("fullpath"), "/home/"), true)
+	newDirPath := Conf.FilePath + "/" + urlPath + "/" + dirName
 	err := os.Mkdir(newDirPath, 0770)
 	if err != nil {
 		glog.Errorf("makeNewDir failed: %v", err)
 	}
 	glog.Infof("makeNewDir: urlPath='%s', newDirPath='%s'", urlPath, newDirPath)
-	http.Redirect(w, r, "/home"+urlPath, http.StatusFound)
+	http.Redirect(w, r, "/home/"+urlPath, http.StatusFound)
 }
 
 func deleteFile(path string) {
-	path = sanitize(path)
+	path = path
 	glog.Infof("Delete File: %s", path)
 	os.RemoveAll(path)
 }
 
 func forDownload(w http.ResponseWriter, r *http.Request) {
 	urlPath := strings.TrimPrefix(r.URL.Path, "/serve/")
-	fileName := sanitize(urlPath)
+	fileName := sanitize(urlPath, true)
 	totalPath := Conf.FilePath + "/" + fileName
 	glog.Infof("forDownload: urlPath='%v'", totalPath)
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
@@ -289,7 +288,7 @@ func forDownload(w http.ResponseWriter, r *http.Request) {
 
 func images(w http.ResponseWriter, r *http.Request) {
 	urlPath := strings.TrimPrefix(r.URL.Path, "/images/")
-	totalPath := "images" + "/" + sanitize(urlPath)
+	totalPath := "images" + "/" + sanitize(urlPath, true)
 	glog.Infof("Image: urlPath='%v'", totalPath)
 	http.ServeFile(w, r, totalPath)
 }
@@ -304,8 +303,8 @@ func upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.ParseMultipartForm(32 << 20)
-	relPath := sanitize(r.PostFormValue("fullpath"))
-	absPath := Conf.FilePath + sanitize(strings.TrimPrefix(relPath, "/home"))
+	relPath := sanitize(r.PostFormValue("fullpath"), true)
+	absPath := Conf.FilePath + "/" + sanitize(strings.TrimPrefix(relPath, "/home/"), true)
 	fhs := r.MultipartForm.File["uploadfile"]
 	for _, fh := range fhs {
 		file, err := fh.Open()
@@ -317,8 +316,8 @@ func upload(w http.ResponseWriter, r *http.Request) {
 		if glog.V(2) {
 			glog.Infof("Upload Header: %v", fh.Header)
 		}
-		newFileName := absPath + sanitize(fh.Filename)
-		glog.Infof("uplad file with name '%s'", newFileName)
+		newFileName := absPath + sanitize(fh.Filename, false)
+		glog.Infof("Upload file with name '%s'", newFileName)
 		f, err := os.OpenFile(newFileName, os.O_WRONLY|os.O_CREATE, 0660)
 		if err != nil {
 			glog.Errorln(err)
@@ -331,14 +330,20 @@ func upload(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, relPath, http.StatusFound)
 }
 
-func sanitize(s string) string {
-	reg, err := regexp.Compile(`[][$&%?@:;#"'´{}]+` + "0x60")
-	if err != nil {
-		glog.Fatalf("Parsing regexp failed: %v", err)
+func sanitize(s string, isPath bool) string {
+	regPath := regexp.MustCompile(`[^a-zA-Z0-9./]+`)
+	regFile := regexp.MustCompile(`[^a-zA-Z0-9.]+`)
+	var s1 string
+	if isPath {
+		s1 = regPath.ReplaceAllString(s, "")
+	} else {
+		s1 = regFile.ReplaceAllString(s, "")
 	}
-	r := reg.ReplaceAllString(s, "")
-
-	return r
+	regDots := regexp.MustCompile(`\.+`)
+	s2 := regDots.ReplaceAllString(s1, ".")
+	regDoubleSlash := regexp.MustCompile(`/+`)
+	s3 := regDoubleSlash.ReplaceAllString(s2, "/")
+	return s3
 }
 
 func authhandler(handler http.HandlerFunc) http.HandlerFunc {
